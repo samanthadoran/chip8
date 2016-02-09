@@ -40,7 +40,7 @@ var instructions: ops = initTable[uint16, proc(c: chip8)]()
 instructions[0x0000u16] = proc(c: chip8) =
   #Ignore SYS ADDR 0NNN
   if instructions.hasKey(c.opcode):
-    instructions[c.opcode and 0xF00Fu16](c)
+    instructions[c.opcode and 0x0FFFu16](c)
     c.pc += 2
   else:
     echo("Unknown opcode: " & cast[int](c.opcode).toHex(4))
@@ -48,21 +48,25 @@ instructions[0x0000u16] = proc(c: chip8) =
       discard
 
 instructions[0x00E0u16] = proc(c: chip8) =
+  echo("CLS")
   #CLS
   for y in 0..<len(c.display):
     for x in 0..<len(c.display[y]):
       c.display[y][x] = 0u8
 
 instructions[0x00EEu16] = proc(c: chip8) =
+  echo("RET")
   #RET
   c.pc = c.stack[c.sp]
   dec(c.sp)
 
 instructions[0x1000u16] = proc(c: chip8) =
+  echo("JP NNN")
   #JP NNN, don't increment pc
   c.pc = c.opcode and 0x0FFFu16
 
 instructions[0x2000u16] = proc(c: chip8) =
+  echo("Call NNN")
   #Call NNN, don't increment pc
   inc(c.sp)
   c.stack[c.sp] = c.pc
@@ -70,41 +74,53 @@ instructions[0x2000u16] = proc(c: chip8) =
 
 
 instructions[0x3000u16] = proc(c: chip8) =
+  echo("SE XNN")
   #SE XNN
-  let vx = c.registers[c.opcode and 0x0F00u16]
+  let xIndex = (c.opcode and 0x0F00u16) shr 8
+  let vx = c.registers[xIndex]
   if cast[uint16](vx) == (c.opcode and 0x00FFu16):
     c.pc += 2
   c.pc += 2
 
 instructions[0x4000u16] = proc(c: chip8) =
+  echo("SNE XNN")
   #SNE XNN
-  let vx = c.registers[c.opcode and 0x0F00u16]
+  let xIndex = (c.opcode and 0x0F00u16) shr 8
+  let vx = c.registers[xIndex]
   if cast[uint16](vx) != (c.opcode and 0x00FFu16):
     c.pc += 2
   c.pc += 2
 
 instructions[0x5000u16] = proc(c: chip8) =
+  echo("SE XY0")
   #SE XY0
-  let vx = c.registers[c.opcode and 0x0F00u16]
-  let vy = c.registers[c.opcode and 0x00F0u16]
+  let xIndex = (c.opcode and 0x0F00u16) shr 8
+  let yIndex = (c.opcode and 0x00F0u16) shr 4
+  let vx = c.registers[xIndex]
+  let vy = c.registers[yIndex]
   if vx == vy:
     c.pc += 2
   c.pc += 2
 
 instructions[0x6000u16] = proc(c: chip8) =
+  echo("LD XNN")
   #LD XNN
-  c.registers[c.opcode and 0x0F00u16] = c.opcode and 0x00FFu16
+  let xIndex = (c.opcode and 0x0F00u16) shr 8
+  c.registers[xIndex] = c.opcode and 0x00FFu16
   c.pc += 2
 
 instructions[0x7000u16] = proc(c: chip8) =
+  echo("ADD XNN")
   #ADD XNN
-  c.registers[c.opcode and 0x0F00u16] += c.opcode and 0x00FFu16
+  let xIndex = (c.opcode and 0x0F00u16) shr 8
+  c.registers[xIndex] += c.opcode and 0x00FFu16
   c.pc += 2
 
 instructions[0x8000u16] = proc(c: chip8) =
   #Switch of most significant nybble
   let lastNybble = c.opcode and 0x000Fu16
   if lastNybble == 0x0000u16:
+    echo("LD XY0")
     #LD XY0
     let xIndex = (c.opcode and 0x0F00u16) shr 8
     let yIndex = (c.opcode and 0x00F0u16) shr 4
@@ -121,27 +137,31 @@ instructions[0x8000u16] = proc(c: chip8) =
   c.pc += 2
 
 instructions[0x8001u16] = proc(c: chip8) =
+  echo("OR XY1")
   #OR XY1
   let xIndex = (c.opcode and 0x0F00u16) shr 8
   let yIndex = (c.opcode and 0x00F0u16) shr 4
   let orValue = c.registers[xIndex] or c.registers[yIndex]
-  c.registers[c.opcode and 0x0F00u16] = orValue
+  c.registers[xIndex] = orValue
 
 instructions[0x8002u16] = proc(c: chip8) =
+  echo("AND XY2")
   #AND XY2
   let xIndex = (c.opcode and 0x0F00u16) shr 8
   let yIndex = (c.opcode and 0x00F0u16) shr 4
   let andValue = c.registers[xIndex] and c.registers[yIndex]
-  c.registers[c.opcode and 0x0F00u16] = andValue
+  c.registers[xIndex] = andValue
 
 instructions[0x8003u16] = proc(c: chip8) =
+  echo("XOR XY3")
   #XOR XY3
   let xIndex = (c.opcode and 0x0F00u16) shr 8
   let yIndex = (c.opcode and 0x00F0u16) shr 4
   let xorValue = c.registers[xIndex] xor c.registers[yIndex]
-  c.registers[c.opcode and 0x0F00u16] = xorValue
+  c.registers[xindex] = xorValue
 
 instructions[0x8004u16] = proc(c: chip8) =
+  echo("ADD XY4")
   #ADD XY4
   let xIndex = (c.opcode and 0x0F00u16) shr 8
   let yIndex = (c.opcode and 0x00F0u16) shr 4
@@ -157,6 +177,7 @@ instructions[0x8004u16] = proc(c: chip8) =
       0u8
 
 instructions[0x8005u16] = proc(c: chip8) =
+  echo("SUB XY5")
   #SUB XY5
   let xIndex = (c.opcode and 0x0F00u16) shr 8
   let yIndex = (c.opcode and 0x00F0u16) shr 4
@@ -172,6 +193,7 @@ instructions[0x8005u16] = proc(c: chip8) =
       0u8
 
 instructions[0x8006u16] = proc(c: chip8) =
+  echo("SHR XY6")
   #SHR XY6
   let xIndex = (c.opcode and 0x0F00u16) shr 8
   let x = cast[uint8](c.registers[xIndex])
@@ -186,6 +208,7 @@ instructions[0x8006u16] = proc(c: chip8) =
   c.registers[xIndex] = x shr 1
 
 instructions[0x8007u16] = proc(c: chip8) =
+  echo("SUBN XY7")
   #SUBN XY7
   let xIndex = (c.opcode and 0x0F00u16) shr 8
   let yIndex = (c.opcode and 0x00F0u16) shr 4
@@ -201,6 +224,7 @@ instructions[0x8007u16] = proc(c: chip8) =
       0u8
 
 instructions[0x800Eu16] = proc(c: chip8) =
+  echo("SHL XYE")
   #SHL XYE
   let xIndex = (c.opcode and 0x0F00u16) shr 8
   let x = cast[uint8](c.registers[xIndex])
@@ -215,6 +239,7 @@ instructions[0x800Eu16] = proc(c: chip8) =
   c.registers[xIndex] = x shl 1
 
 instructions[0x9000u16] = proc(c: chip8) =
+  echo("SNE XY0")
   #SNE XY0
   let xIndex = (c.opcode and 0x0F00u16) shr 8
   let yIndex = (c.opcode and 0x00F0u16) shr 4
@@ -225,16 +250,19 @@ instructions[0x9000u16] = proc(c: chip8) =
   c.pc += 2
 
 instructions[0xA000u16] = proc(c: chip8) =
+  echo("LD NNN")
   #LD NNN
   c.I = c.opcode and 0x0FFFu16
   c.pc += 2
 
 instructions[0xB000u16] = proc(c: chip8) =
+  echo("JP NNN + V0")
   #JP NNN + V0
   c.pc = c.opcode and 0x0FFF
   c.pc += c.registers[0]
 
 instructions[0xC000u16] = proc(c: chip8) =
+  echo("RND XKK")
   #RND XKK
   let xIndex = (c.opcode and 0x0F00u16) shr 8
   let x = c.registers[xIndex]
@@ -242,6 +270,7 @@ instructions[0xC000u16] = proc(c: chip8) =
   c.pc += 2
 
 instructions[0xD000u16] = proc(c: chip8) =
+  echo("DRAW XYN")
   #DRAW XYN
   let xIndex = (c.opcode and 0x0F00u16) shr 8
   let yIndex = (c.opcode and 0x00F0u16) shr 4
@@ -321,6 +350,7 @@ instructions[0xE000u16] = proc(c: chip8) =
 
 
 instructions[0xE09Eu16] = proc(c: chip8) =
+  echo("SKP X9E")
   #SKP X9E
   #If key down, skip next instruction
   let xIndex = (c.opcode and 0x0F00u16) shr 8
@@ -329,6 +359,7 @@ instructions[0xE09Eu16] = proc(c: chip8) =
     c.pc += 2
 
 instructions[0xE0A1u16] = proc(c: chip8) =
+  echo("SKNP XA1")
   #SKNP XA1
   #If not key down, skip next instruction
   let xIndex = (c.opcode and 0x0F00u16) shr 8
@@ -347,11 +378,13 @@ instructions[0xF000u16] = proc(c: chip8) =
     echo("Unknown opcode: " & cast[int](c.opcode).toHex(4))
 
 instructions[0xF007u16] = proc(c: chip8) =
+  echo("LD VX, DT X07")
   #LD Vx, DT X07
   let xIndex = (c.opcode and 0x0F00u16) shr 8
   c.registers[xIndex] = c.delayTimer
 
 instructions[0xF00Au16] = proc(c: chip8) =
+  echo("LD Vx, K X0A")
   #LD Vx, K X0A
   #We need to lower pc by two if we don't have a key to simplify models
   let xIndex = (c.opcode and 0x0F00u16) shr 8
@@ -368,30 +401,35 @@ instructions[0xF00Au16] = proc(c: chip8) =
 
 
 instructions[0xF015u16] = proc(c: chip8) =
+  echo("LD DT, VX X15")
   #LD DT, Vx X15
   let xIndex = (c.opcode and 0x0F00u16) shr 8
   let x = (c.registers[xIndex])
   c.delayTimer = x
 
 instructions[0xF018u16] = proc(c: chip8) =
+  echo("LD ST, Vx X18")
   #LD ST, Vx X18
   let xIndex = (c.opcode and 0x0F00u16) shr 8
   let x = (c.registers[xIndex])
   c.soundTimer = x
 
 instructions[0xF018u16] = proc(c: chip8) =
+  echo("ADD I, Vx X1E")
   #ADD I, Vx X1E
   let xIndex = (c.opcode and 0x0F00u16) shr 8
   let x = (c.registers[xIndex])
   c.I += x
 
 instructions[0xF029u16] = proc(c: chip8) =
-  #LD F, Vx x29
+  echo("LD F, Vx X29")
+  #LD F, Vx X29
   let xIndex = (c.opcode and 0x0F00u16) shr 8
   let x = (c.registers[xIndex])
   c.I = c.memory[0x50u8 + 5u8 * x]
 
 instructions[0xF033u16] = proc(c: chip8) =
+  echo("LD B, Vx")
   #LD B, Vx
   let xIndex = (c.opcode and 0x0F00u16) shr 8
   let x = (c.registers[xIndex])
@@ -418,12 +456,14 @@ instructions[0xF033u16] = proc(c: chip8) =
       0u8
 
 instructions[0xF055u16] = proc(c: chip8) =
+  echo("LD [I], Vx X55")
   #LD [I], Vx X55
   let x = (c.opcode and 0x0F00u16) shr 8
   for i in 0..x:
     c.memory[c.I + i] = c.registers[i]
 
 instructions[0xF065u16] = proc(c: chip8) =
+  echo("LD Vx, [I]")
   #LD Vx, [I]
   let x = (c.opcode and 0x0F00u16) shr 8
   for i in 0..x:
@@ -442,8 +482,18 @@ proc newChip8(): chip8 =
   result.draw = false
   loadFonts(result)
 
+proc loadROM(c: chip8, rom: string): bool =
+  var f: File
+  if f.open(rom):
+    result = true
+    discard f.readBytes(c.memory, c.pc, 0xDFF)
+    f.close()
+  else:
+    echo("Failed to open file!")
+    result = false
+
 proc fetch(c: chip8) =
-  c.opcode = (c.memory[c.pc] shl 8) or c.memory[c.pc + 1]
+  c.opcode = cast[uint16](c.memory[c.pc]) shl 8 or cast[uint16](c.memory[c.pc + 1])
 
 proc decode(c: chip8): proc(c: chip8) =
   let firstNybble = 0xF000u16 and c.opcode
@@ -456,27 +506,29 @@ proc decode(c: chip8): proc(c: chip8) =
 
 proc main() =
   var c = newChip8()
-  while false:
-    #Fetch
-    c.fetch()
-    #Decode
-    let instruction = c.decode()
-    #Execute
-    instruction(c)
+  if c.loadRom("pong"):
+    while true:
+      #Fetch
+      c.fetch()
+      echo("OPCODE: ", c.opcode)
+      #Decode
+      let instruction = c.decode()
+      #Execute
+      instruction(c)
 
-    #If the draw flag is set...
-    if c.draw:
-      #Unset it
-      c.draw = false
-      #Draw the screen
-      discard
+      #If the draw flag is set...
+      if c.draw:
+        #Unset it
+        c.draw = false
+        #Draw the screen
+        echo("Would have drawn")
 
-    #If the sound timer isn't 0 yet...
-    if c.soundTimer != 0u8:
-      #Lower it
-      #TODO: Change to 60hz
-      dec(c.soundTimer)
-      #And play a sound
-      discard
+      #If the sound timer isn't 0 yet...
+      if c.soundTimer != 0u8:
+        #Lower it
+        #TODO: Change to 60hz
+        dec(c.soundTimer)
+        #And play a sound
+        echo("Would have played a sound")
 
 main()
