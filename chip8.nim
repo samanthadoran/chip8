@@ -102,6 +102,7 @@ instructions[0x7000u16] = proc(c: chip8) =
   c.pc += 2
 
 instructions[0x8000u16] = proc(c: chip8) =
+  #Switch of most significant nybble
   let lastNybble = c.opcode and 0x000Fu16
   if lastNybble == 0x0000u16:
     #LD XY0
@@ -309,6 +310,7 @@ instructions[0xD000u16] = proc(c: chip8) =
   c.pc += 2
 
 instructions[0xE000u16] = proc(c: chip8) =
+  #Switch of most significant nybble
   let maskedOp = c.opcode and 0xF0FFu16
   if instructions.hasKey(maskedOp)
     instruction[maskedOp](c)
@@ -321,18 +323,21 @@ instructions[0xE000u16] = proc(c: chip8) =
 instructions[0xE09Eu16] = proc(c: chip8) =
   #SKP X9E
   #If key down, skip next instruction
-  #TODO: Implement
-  if false:
+  let xIndex = (c.opcode and 0x0F00u16) shr 8
+  let x = (c.registers[xIndex])
+  if keys[x]:
     c.pc += 2
 
 instructions[0xE0A1u16] = proc(c: chip8) =
   #SKNP XA1
   #If not key down, skip next instruction
-  #TODO: Implement
-  if false:
+  let xIndex = (c.opcode and 0x0F00u16) shr 8
+  let x = (c.registers[xIndex])
+  if not keys[x]:
     c.pc += 2
 
 instructions[0xF000u16] = proc(c: chip8) =
+  #Switch of most significant nybble
   let maskedOp = c.opcode and 0xF0FFu16
   if instructions.hasKey(maskedOp)
     instruction[maskedOp](c)
