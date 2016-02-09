@@ -39,8 +39,13 @@ var instructions: ops = initTable[uint16, proc(c: chip8)]()
 
 instructions[0x0000u16] = proc(c: chip8) =
   #Ignore SYS ADDR 0NNN
-  if c.opcode == 0x00EEu16 or c.opcode == 0x000E:
-    instructions[c.opcode](c)
+  if instructions.hasKey(c.opcode):
+    instructions[c.opcode and 0xF00Fu16](c)
+    c.pc += 2
+  else:
+    echo("Unknown opcode: " & cast[int](c.opcode).toHex(4))
+    while true:
+      discard
 
 instructions[0x00E0u16] = proc(c: chip8) =
   #CLS
@@ -48,13 +53,10 @@ instructions[0x00E0u16] = proc(c: chip8) =
     for x in 0..<len(c.display[y]):
       c.display[y][x] = 0u8
 
-  c.pc += 2
-
 instructions[0x00EEu16] = proc(c: chip8) =
   #RET
   c.pc = c.stack[c.sp]
   dec(c.sp)
-  c.pc += 2
 
 instructions[0x1000u16] = proc(c: chip8) =
   #JP NNN, don't increment pc
@@ -106,8 +108,6 @@ instructions[0x8000u16] = proc(c: chip8) =
     let xIndex = (c.opcode and 0x0F00u16) shr 8
     let yIndex = (c.opcode and 0x00F0u16) shr 4
     c.registers[xIndex] = c.registers[yIndex]
-    #Don't forget to do this here!
-    c.pc += 2
   else:
     if instructions.hasKey(c.opcode and 0xF00Fu16):
       instructions[c.opcode and 0xF00Fu16](c)
@@ -116,13 +116,15 @@ instructions[0x8000u16] = proc(c: chip8) =
       while true:
         discard
 
+  #Increment PC
+  c.pc += 2
+
 instructions[0x8001u16] = proc(c: chip8) =
   #OR XY1
   let xIndex = (c.opcode and 0x0F00u16) shr 8
   let yIndex = (c.opcode and 0x00F0u16) shr 4
   let orValue = c.registers[xIndex] or c.registers[yIndex]
   c.registers[c.opcode and 0x0F00u16] = orValue
-  c.pc += 2
 
 instructions[0x8002u16] = proc(c: chip8) =
   #AND XY2
@@ -130,7 +132,6 @@ instructions[0x8002u16] = proc(c: chip8) =
   let yIndex = (c.opcode and 0x00F0u16) shr 4
   let andValue = c.registers[xIndex] and c.registers[yIndex]
   c.registers[c.opcode and 0x0F00u16] = andValue
-  c.pc += 2
 
 instructions[0x8003u16] = proc(c: chip8) =
   #XOR XY3
@@ -138,7 +139,6 @@ instructions[0x8003u16] = proc(c: chip8) =
   let yIndex = (c.opcode and 0x00F0u16) shr 4
   let xorValue = c.registers[xIndex] xor c.registers[yIndex]
   c.registers[c.opcode and 0x0F00u16] = xorValue
-  c.pc += 2
 
 instructions[0x8004u16] = proc(c: chip8) =
   #ADD XY4
@@ -155,8 +155,6 @@ instructions[0x8004u16] = proc(c: chip8) =
     else:
       0u8
 
-  c.pc += 2
-
 instructions[0x8005u16] = proc(c: chip8) =
   #SUB XY5
   let xIndex = (c.opcode and 0x0F00u16) shr 8
@@ -172,8 +170,6 @@ instructions[0x8005u16] = proc(c: chip8) =
     else:
       0u8
 
-  c.pc += 2
-
 instructions[0x8006u16] = proc(c: chip8) =
   #SHR XY6
   let xIndex = (c.opcode and 0x0F00u16) shr 8
@@ -187,8 +183,6 @@ instructions[0x8006u16] = proc(c: chip8) =
       0u8
 
   c.registers[xIndex] = x shr 1
-
-  c.pc += 2
 
 instructions[0x8007u16] = proc(c: chip8) =
   #SUB XY7
@@ -205,8 +199,6 @@ instructions[0x8007u16] = proc(c: chip8) =
     else:
       0u8
 
-  c.pc += 2
-
 instructions[0x8006u16] = proc(c: chip8) =
   #SHL XYE
   let xIndex = (c.opcode and 0x0F00u16) shr 8
@@ -220,8 +212,6 @@ instructions[0x8006u16] = proc(c: chip8) =
       0u8
 
   c.registers[xIndex] = x shl 1
-
-  c.pc += 2
 
 instructions[0x9000u16] = proc(c: chip8) =
   #SNE XY0
@@ -252,60 +242,78 @@ instructions[0xC000u16] = proc(c: chip8) =
 
 instructions[0xD000u16] = proc(c: chip8) =
   #DRAW XYN
-  let bytes = c.opcode and 0x000Fu16
   let xIndex = (c.opcode and 0x0F00u16) shr 8
   let yIndex = (c.opcode and 0x00F0u16) shr 4
+  let bytes = c.opcode and 0x000Fu16
   let x = (c.registers[xIndex])
   let y = (c.registers[yIndex])
+
   #So, we need to know what x mod 8 is to see how much we need to play with the
   #The bitmap via shifting
   let xM = x mod 8
 
   #Set collision to be zero initially
   c.registers[15] = 0
-  #TODO:SET COLLISION VF
+
   #So, we should shr every byte my xm then shl by 8 - x in the next byte
   for i in 0..<bytes:
-    let original = c.display[y + cast[uint8](i)][x div 8]
-    c.display[y][x div 8] = c.display[y][x div 8] xor c.memory[c.I + cast[uint16](i)] shr xM
+    let xdIndex = x div 8
+    let ydIndex =
+      if y + cast[uint8](i) < 32:
+        y + cast[uint8](i)
+      else:
+        y + cast[uint8](i) - 32u8
 
-    #Something changed
-    if original != c.display[y][x div 8]:
+    #Keep a copy of the original so we can compare to it
+    let original = c.display[ydIndex][xdIndex]
+    #Chip 8 displays by xoring the screen
+    c.display[ydIndex][xdIndex] = c.display[ydIndex][xdIndex] xor c.memory[c.I + cast[uint16](i)] shr xM
+
+    #If it is different, we will need to update the screen
+    if original != c.display[ydIndex][xdIndex]:
       c.draw = true
 
-    #Collision
-    if (original and c.display[y][x div 8]) != original:
+    #If original AND new isn't the same, we disabled a pixel, thus set collision
+    if (original and c.display[ydIndex][xdIndex]) != original:
       c.registers[15] = 1u8
 
     #If we haven't done this aligned, we need some shl logic
     if xM != 0:
+
+      #We need to start at x = 0
       if x div 8 == 7u8:
-        let originalLeftTrick = c.display[y][0]
-        c.display[y][0] = c.display[y][0] xor c.memory[c.I + cast[uint16](i)] shl (8u8 - xM)
+        let originalLeftTrick = c.display[ydIndex][0]
+        c.display[ydIndex][0] = c.display[ydIndex][0] xor c.memory[c.I + cast[uint16](i)] shl (8u8 - xM)
 
-        #Something changed
-        if originalLeftTrick != c.display[y][0]:
+        #If it is different, we will need to update the screen
+        if originalLeftTrick != c.display[ydIndex][0]:
           c.draw = true
 
-        #Collision
-        if (originalLeftTrick and c.display[y][0]) != original:
+        #If original AND new isn't the same, we disabled a pixel, thus set collision
+        if (originalLeftTrick and c.display[ydIndex][0]) != original:
           c.registers[15] = 1u8
+
+      #We aren't wrapping around to the left, just add one
       else:
-        let originalLeftTrick = c.display[y][(x div 8) + 1]
-        c.display[y][(x div 8) + 1] = c.display[y][(x div 8) + 1] xor c.memory[c.I + cast[uint16](i)] shl (8u8 - xM)
+        let originalLeftTrick = c.display[ydIndex][xdIndex + 1]
+        c.display[y][(x div 8) + 1] = c.display[ydIndex][(x div 8) + 1] xor c.memory[c.I + cast[uint16](i)] shl (8u8 - xM)
 
-        #Something changed
-        if originalLeftTrick != c.display[y][(x div 8) + 1]:
+        #If it is different, we will need to update the screen
+        if originalLeftTrick != c.display[ydIndex][xdIndex + 1]:
           c.draw = true
 
-        #Collision
-        if (originalLeftTrick and c.display[y][(x div 8) + 1]) != original:
+        #If original AND new isn't the same, we disabled a pixel, thus set collision
+        if (originalLeftTrick and c.display[ydIndex][xdIndex + 1]) != original:
           c.registers[15] = 1u8
+
+  c.pc += 2
 
 instructions[0xE000u16] = proc(c: chip8) =
   let maskedOp = c.opcode and 0xF0FFu16
   if instructions.hasKey(maskedOp)
     instruction[maskedOp](c)
+    #Increment PC
+    c.pc += 2
   else:
     echo("Unknown opcode: " & cast[int](c.opcode).toHex(4))
 
@@ -313,10 +321,9 @@ instructions[0xE000u16] = proc(c: chip8) =
 instructions[0xE09Eu16] = proc(c: chip8) =
   #SKP X9E
   #If key down, skip next instruction
+  #TODO: Implement
   if false:
     c.pc += 2
-  c.pc += 2
-  discard
 
 instructions[0xE0A1u16] = proc(c: chip8) =
   #SKNP XA1
@@ -324,12 +331,13 @@ instructions[0xE0A1u16] = proc(c: chip8) =
   #TODO: Implement
   if false:
     c.pc += 2
-  c.pc += 2
 
 instructions[0xF000u16] = proc(c: chip8) =
   let maskedOp = c.opcode and 0xF0FFu16
   if instructions.hasKey(maskedOp)
     instruction[maskedOp](c)
+    #Increment PC
+    c.pc += 2
   else:
     echo("Unknown opcode: " & cast[int](c.opcode).toHex(4))
 
@@ -338,12 +346,10 @@ instructions[0xF007u16] = proc(c: chip8) =
   let xIndex = (c.opcode and 0x0F00u16) shr 8
   c.registers[xIndex] = c.delayTimer
 
-  c.pc += 2
-
 instructions[0xF00Au16] = proc(c: chip8) =
   #LD Vx, K X0A
   #TODO: Implement
-  c.pc += 2
+  discard
 
 instructions[0xF015u16] = proc(c: chip8) =
   #LD DT, Vx X15
@@ -351,15 +357,11 @@ instructions[0xF015u16] = proc(c: chip8) =
   let x = (c.registers[xIndex])
   c.delayTimer = x
 
-  c.pc += 2
-
 instructions[0xF018u16] = proc(c: chip8) =
   #LD ST, Vx X18
   let xIndex = (c.opcode and 0x0F00u16) shr 8
   let x = (c.registers[xIndex])
   c.soundTimer = x
-
-  c.pc += 2
 
 instructions[0xF018u16] = proc(c: chip8) =
   #ADD I, Vx X1E
@@ -367,15 +369,11 @@ instructions[0xF018u16] = proc(c: chip8) =
   let x = (c.registers[xIndex])
   c.I += x
 
-  c.pc += 2
-
 instructions[0xF029u16] = proc(c: chip8) =
   #LD F, Vx x29
   let xIndex = (c.opcode and 0x0F00u16) shr 8
   let x = (c.registers[xIndex])
   c.I = memory[0x50 + 5 * x]
-
-  c.pc += 2
 
 instructions[0xF033u16] = proc(c: chip8) =
   #LD B, Vx
@@ -403,23 +401,17 @@ instructions[0xF033u16] = proc(c: chip8) =
     else:
       0u8
 
-  c.pc += 2
-
 instructions[0xF055u16] = proc(c: chip8) =
   #LD [I], Vx X55
   let x = (c.opcode and 0x0F00u16) shr 8
   for i in 0..x:
     c.memory[c.I + i] = c.registers[i]
 
-  c.pc += 2
-
 instructions[0xF065u16] = proc(c: chip8) =
   #LD Vx, [I]
   let x = (c.opcode and 0x0F00u16) shr 8
   for i in 0..x:
     c.registers[i] = c.memory[c.I + i]
-
-  c.pc += 2
 
 proc loadFonts(c: chip8) =
   let fontStart = 0x50
@@ -449,12 +441,26 @@ proc decode(c: chip8): proc(c: chip8) =
 proc main() =
   var c = newChip8()
   while false:
+    #Fetch
     c.fetch()
+    #Decode
     let instruction = c.decode()
+    #Execute
     instruction(c)
 
+    #If the draw flag is set...
     if c.draw:
+      #Unset it
       c.draw = false
+      #Draw the screen
+      discard
+
+    #If the sound timer isn't 0 yet...
+    if c.soundTimer != 0u8:
+      #Lower it
+      #TODO: Change to 60hz
+      dec(c.soundTimer)
+      #And play a sound
       discard
 
 main()
