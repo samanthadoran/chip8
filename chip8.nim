@@ -303,10 +303,123 @@ instructions[0xD000u16] = proc(c: chip8) =
           c.registers[15] = 1u8
 
 instructions[0xE000u16] = proc(c: chip8) =
+  let maskedOp = c.opcode and 0xF0FFu16
+  if instructions.hasKey(maskedOp)
+    instruction[maskedOp](c)
+  else:
+    echo("Unknown opcode: " & cast[int](c.opcode).toHex(4))
+
+
+instructions[0xE09Eu16] = proc(c: chip8) =
+  #SKP X9E
+  #If key down, skip next instruction
+  if false:
+    c.pc += 2
+  c.pc += 2
   discard
 
+instructions[0xE0A1u16] = proc(c: chip8) =
+  #SKNP XA1
+  #If not key down, skip next instruction
+  #TODO: Implement
+  if false:
+    c.pc += 2
+  c.pc += 2
+
 instructions[0xF000u16] = proc(c: chip8) =
-  discard
+  let maskedOp = c.opcode and 0xF0FFu16
+  if instructions.hasKey(maskedOp)
+    instruction[maskedOp](c)
+  else:
+    echo("Unknown opcode: " & cast[int](c.opcode).toHex(4))
+
+instructions[0xF007u16] = proc(c: chip8) =
+  #LD Vx, DT X07
+  let xIndex = (c.opcode and 0x0F00u16) shr 8
+  c.registers[xIndex] = c.delayTimer
+
+  c.pc += 2
+
+instructions[0xF00Au16] = proc(c: chip8) =
+  #LD Vx, K X0A
+  #TODO: Implement
+  c.pc += 2
+
+instructions[0xF015u16] = proc(c: chip8) =
+  #LD DT, Vx X15
+  let xIndex = (c.opcode and 0x0F00u16) shr 8
+  let x = (c.registers[xIndex])
+  c.delayTimer = x
+
+  c.pc += 2
+
+instructions[0xF018u16] = proc(c: chip8) =
+  #LD ST, Vx X18
+  let xIndex = (c.opcode and 0x0F00u16) shr 8
+  let x = (c.registers[xIndex])
+  c.soundTimer = x
+
+  c.pc += 2
+
+instructions[0xF018u16] = proc(c: chip8) =
+  #ADD I, Vx X1E
+  let xIndex = (c.opcode and 0x0F00u16) shr 8
+  let x = (c.registers[xIndex])
+  c.I += x
+
+  c.pc += 2
+
+instructions[0xF029u16] = proc(c: chip8) =
+  #LD F, Vx x29
+  let xIndex = (c.opcode and 0x0F00u16) shr 8
+  let x = (c.registers[xIndex])
+  c.I = memory[0x50 + 5 * x]
+
+  c.pc += 2
+
+instructions[0xF033u16] = proc(c: chip8) =
+  #LD B, Vx
+  let xIndex = (c.opcode and 0x0F00u16) shr 8
+  let x = (c.registers[xIndex])
+
+  #Set hundreds
+  c.memory[c.I] =
+    if x >= 100u8:
+      cast[uint8](($x[0]).toInt)
+    else:
+      0u8
+
+  #Set tens
+  c.memory[c.I + 1] =
+    if x >= 10u8:
+      cast[uint8](($x[1]).toInt)
+    else:
+      0u8
+
+  #Set ones
+  c.memory[c.I + 2] =
+    if x >= 1u8:
+      cast[uint8](($x[0]).toInt)
+    else:
+      0u8
+
+  c.pc += 2
+
+instructions[0xF055u16] = proc(c: chip8) =
+  #LD [I], Vx X55
+  let x = (c.opcode and 0x0F00u16) shr 8
+  for i in 0..x:
+    c.memory[c.I + i] = c.registers[i]
+
+  c.pc += 2
+
+instructions[0xF065u16] = proc(c: chip8) =
+  #LD Vx, [I]
+  let x = (c.opcode and 0x0F00u16) shr 8
+  for i in 0..x:
+    c.registers[i] = c.memory[c.I + i]
+
+  c.pc += 2
 
 proc loadFonts(c: chip8) =
   let fontStart = 0x50
@@ -339,5 +452,9 @@ proc main() =
     c.fetch()
     let instruction = c.decode()
     instruction(c)
+
+    if c.draw:
+      c.draw = false
+      discard
 
 main()
