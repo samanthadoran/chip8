@@ -1,36 +1,38 @@
 import tables, strutils, math, sdl2, times
 
+#TODO: test suite
+
 type
-  chip8 = ref Chip8Obj
+  chip8* = ref Chip8Obj
   Chip8Obj = object
     #4K of memory
-    memory: array[4096, uint8]
+    memory*: array[4096, uint8]
 
     #TODO: Consider using an actual stack, maybe backed by linked list
-    stack: array[16, uint16]
-    sp: uint8
+    stack*: array[16, uint16]
+    sp*: uint8
 
     #V0..VF
-    registers: array[16, uint8]
+    registers*: array[16, uint8]
     #Timers DT & ST
-    delayTimer: uint8
-    soundTimer: uint8
+    delayTimer*: uint8
+    soundTimer*: uint8
     #Program Counter Register
-    pc: uint16
+    pc*: uint16
     #Index Register
-    I: uint16
+    I*: uint16
 
     #Fetched opcode
-    opcode: uint16
+    opcode*: uint16
 
     #State of the keyboard
-    keyboard: array[16, bool]
+    keyboard*: array[16, bool]
     #State of the display
-    display: array[32, array[8, uint8]]
+    display*: array[32, array[8, uint8]]
     #Draw flag
-    draw: bool
+    draw*: bool
 
-  ops = Table[uint16, proc(c: chip8)]
+  ops* = Table[uint16, proc(c: chip8)]
 
 var debug = false
 const fontOffset = 0x50u16
@@ -56,7 +58,7 @@ const fonts: array[80, uint8] = [
   0xF0u8, 0x80u8, 0xF0u8, 0x80u8, 0x80u8  # F
 ]
 
-var instructions: ops = initTable[uint16, proc(c: chip8)]()
+var instructions*: ops = initTable[uint16, proc(c: chip8)]()
 
 instructions[0x0000u16] = proc(c: chip8) =
   #Ignore SYS ADDR 0NNN
@@ -300,7 +302,7 @@ instructions[0xB000u16] = proc(c: chip8) =
   #JP NNN + V0
   if debug:
     echo("JP NNN + V0")
-  c.pc = c.opcode and 0x0FFF
+  c.pc = c.opcode and 0x0FFFu16
   c.pc += c.registers[0]
 
 instructions[0xC000u16] = proc(c: chip8) =
@@ -314,7 +316,6 @@ instructions[0xC000u16] = proc(c: chip8) =
 
 instructions[0xD000u16] = proc(c: chip8) =
   #DRAW XYN
-  c.draw = true
   if debug:
     echo("DRAW XYN")
   let xIndex = (c.opcode and 0x0F00u16) shr 8
@@ -326,23 +327,19 @@ instructions[0xD000u16] = proc(c: chip8) =
   #So, we need to know what x mod 8 is to see how much we need to play with the
   #The bitmap via shifting
   let xM = x mod 8
+  let xdIndex = (x div 8) mod 8
 
   #Set collision to be zero initially
   c.registers[15] = 0
 
   #So, we should shr every byte my xm then shl by 8 - x in the next byte
   for i in 0..<bytes:
-    let xdIndex = x div 8
-    let ydIndex =
-      if y + cast[uint8](i) < 32:
-        y + cast[uint8](i)
-      else:
-        y + cast[uint8](i) - 32u8
+    let ydIndex = (y + cast[uint8](i)) mod 32
 
     #Keep a copy of the original so we can compare to it
     let original = c.display[ydIndex][xdIndex]
     #Chip 8 displays by xoring the screen
-    c.display[ydIndex][xdIndex] = c.display[ydIndex][xdIndex] xor c.memory[c.I + cast[uint16](i)] shr xM
+    c.display[ydIndex][xdIndex] = (c.display[ydIndex][xdIndex]) xor (c.memory[c.I + cast[uint16](i)] shr xM)
 
     #If it is different, we will need to update the screen
     if original != c.display[ydIndex][xdIndex]:
@@ -356,29 +353,29 @@ instructions[0xD000u16] = proc(c: chip8) =
     if xM != 0:
 
       #We need to start at x = 0
-      if x div 8 == 7u8:
+      if xdIndex == 7u8:
         let originalLeftTrick = c.display[ydIndex][0]
-        c.display[ydIndex][0] = c.display[ydIndex][0] xor c.memory[c.I + cast[uint16](i)] shl (8u8 - xM)
+        c.display[ydIndex][0] = c.display[ydIndex][0] xor (c.memory[c.I + cast[uint16](i)] shl (8u8 - xM))
 
         #If it is different, we will need to update the screen
         if originalLeftTrick != c.display[ydIndex][0]:
           c.draw = true
 
         #If original AND new isn't the same, we disabled a pixel, thus set collision
-        if (originalLeftTrick and c.display[ydIndex][0]) != original:
+        if (originalLeftTrick and c.display[ydIndex][0]) != originalLeftTrick:
           c.registers[15] = 1u8
 
       #We aren't wrapping around to the left, just add one
       else:
         let originalLeftTrick = c.display[ydIndex][xdIndex + 1]
-        c.display[y][(x div 8) + 1] = c.display[ydIndex][(x div 8) + 1] xor c.memory[c.I + cast[uint16](i)] shl (8u8 - xM)
+        c.display[y][xdIndex + 1] = c.display[ydIndex][xdIndex + 1] xor (c.memory[c.I + cast[uint16](i)] shl (8u8 - xM))
 
         #If it is different, we will need to update the screen
         if originalLeftTrick != c.display[ydIndex][xdIndex + 1]:
           c.draw = true
 
         #If original AND new isn't the same, we disabled a pixel, thus set collision
-        if (originalLeftTrick and c.display[ydIndex][xdIndex + 1]) != original:
+        if (originalLeftTrick and c.display[ydIndex][xdIndex + 1]) != originalLeftTrick:
           c.registers[15] = 1u8
 
   c.pc += 2
@@ -444,7 +441,7 @@ instructions[0xF00Au16] = proc(c: chip8) =
       break
 
   #We need to lower pc by two. This allows us to pretend to 'wait' for a key
-  if activeKey != 255:
+  if activeKey == 255:
     c.pc -= 2
   else:
     c.registers[xIndex] = activeKey
@@ -531,7 +528,7 @@ proc loadFonts(c: chip8) =
   for i in 0..<len(fonts):
     c.memory[cast[uint16](i) + fontStart] = fonts[i]
 
-proc newChip8(): chip8 =
+proc newChip8*(): chip8 =
   math.randomize()
   result = new(chip8)
   result.I = 0
@@ -541,7 +538,7 @@ proc newChip8(): chip8 =
 
 #TODO: Save states
 
-proc loadROM(c: chip8, rom: string): bool =
+proc loadROM*(c: chip8, rom: string): bool =
   var f: File
   if f.open(rom):
     result = true
@@ -553,13 +550,13 @@ proc loadROM(c: chip8, rom: string): bool =
     echo("Failed to open file!")
     result = false
 
-proc fetch(c: chip8) =
+proc fetch*(c: chip8) =
   #Be careful here, we must make sure these are 16 bit before doing any shifts.
   #We could separate that onto two lines so that it has no chance of happening,
   #but it looks nice as a one liner
   c.opcode = (cast[uint16](c.memory[c.pc]) shl 8) or cast[uint16](c.memory[c.pc + 1])
 
-proc decode(c: chip8): proc(c: chip8) =
+proc decode*(c: chip8): proc(c: chip8) =
   let firstNybble = 0xF000u16 and c.opcode
   if instructions.hasKey(firstNybble):
     result = instructions[firstNybble]
@@ -568,7 +565,7 @@ proc decode(c: chip8): proc(c: chip8) =
     while true:
       discard
 
-proc draw(c: chip8, ren: RendererPtr) =
+proc draw*(c: chip8, ren: RendererPtr) =
   for y in 0..<len(c.display):
     for x in 0..<len(c.display[y]):
       for bit in 0..7:
@@ -578,13 +575,13 @@ proc draw(c: chip8, ren: RendererPtr) =
         r.y = cast[cint](y) * 8
         r.w = 8
         r.h = 8
-        let state: bool = ((c.display[y][x] shr cast[uint8](bit)) and 0x1u8) == 0x1
+        let state: bool = ((c.display[y][x] shr (cast[uint8](bit)) and 0x1u8)) == 0x1
         if state:
           setDrawColor(ren, uint8(255), uint8(255), uint8(255))
           fillRect(ren, r)
         setDrawColor(ren, uint8(0), uint8(0), uint8(0))
 
-proc setStateOfKey(c: chip8, key: Scancode, state: bool) =
+proc setStateOfKey*(c: chip8, key: Scancode, state: bool) =
   case key
   #1
   of SDL_SCANCODE_1:
@@ -637,82 +634,83 @@ proc setStateOfKey(c: chip8, key: Scancode, state: bool) =
   else:
     discard
 
-proc main() =
-  #Setup SDL
-  var
-    win: WindowPtr
-    ren: RendererPtr
-    evt = sdl2.defaultEvent
-  discard init(INIT_EVERYTHING)
-  win = createWindow("chip8 emulator", 100, 100, 1280, 720, SDL_WINDOW_SHOWN)
-  if win == nil:
-    echo("Create window failed! Error: ", getError())
-    quit(1)
+when isMainModule:
+  proc main() =
+    #Setup SDL
+    var
+      win: WindowPtr
+      ren: RendererPtr
+      evt = sdl2.defaultEvent
+    discard init(INIT_EVERYTHING)
+    win = createWindow("chip8 emulator", 100, 100, 536, 268, SDL_WINDOW_SHOWN)
+    if win == nil:
+      echo("Create window failed! Error: ", getError())
+      quit(1)
 
-  ren = createRenderer(win, -1, Renderer_Accelerated)
-  if ren == nil:
-    echo("Create renderer failed! Error: ", getError())
-    quit(1)
+    ren = createRenderer(win, -1, Renderer_Accelerated)
+    if ren == nil:
+      echo("Create renderer failed! Error: ", getError())
+      quit(1)
 
-  var c = newChip8()
-  if c.loadRom("INVADERS"):
-    var timeStart = epochTime()
-    let sixtyhz = (1.0/60.0)
-    var runGame = true
-    while true:
-      #Handle Events
-      let frameTime = epochTime()
-      if frameTime - timeStart < sixtyhz / 10:
-        continue
-      while pollEvent(evt):
-        if evt.kind == QuitEvent:
-          runGame = false
+    var c = newChip8()
+    if c.loadRom("TETRIS"):
+      var timeStart = epochTime()
+      let sixtyhz = (1.0/60.0)
+      var runGame = true
+      while true:
+        #Handle Events
+        let frameTime = epochTime()
+        if frameTime - timeStart < sixtyhz / 10:
+          continue
+        while pollEvent(evt):
+          if evt.kind == QuitEvent:
+            runGame = false
+            break
+
+          if evt.kind == KeyDown:
+            var keyboardEvent = cast[KeyboardEventPtr](addr(evt))
+            let key = keyboardEvent.keysym.scancode
+            c.setStateOfKey(key, true)
+
+          if evt.kind == KeyUp:
+            var keyboardEvent = cast[KeyboardEventPtr](addr(evt))
+            let key = keyboardEvent.keysym.scancode
+            c.setStateOfKey(key, false)
+
+        if not runGame:
           break
 
-        if evt.kind == KeyDown:
-          var keyboardEvent = cast[KeyboardEventPtr](addr(evt))
-          let key = keyboardEvent.keysym.scancode
-          c.setStateOfKey(key, true)
-
-        if evt.kind == KeyUp:
-          var keyboardEvent = cast[KeyboardEventPtr](addr(evt))
-          let key = keyboardEvent.keysym.scancode
-          c.setStateOfKey(key, false)
-
-      if not runGame:
-        break
-
-      #Fetch
-      c.fetch()
-      #Decode
-      let instruction = c.decode()
-      if debug:
-        echo("\nOPCODE: ", cast[int](c.opcode).toHex(4))
-      #Execute
-      instruction(c)
-
-      #If the draw flag is set...
-      if c.draw:
-        #Unset it
-        c.draw = false
-        #Draw the screen
-        ren.clear
-        draw(c, ren)
-        ren.present
-
-      #If the sound timer isn't 0 yet...
-      if c.soundTimer != 0u8 and frameTime - timeStart >= sixtyhz:
-        #Lower it
-        dec(c.soundTimer)
-        #And play a sound
+        #Fetch
+        c.fetch()
+        #Decode
+        let instruction = c.decode()
         if debug:
-          echo("Would have played a sound")
+          echo("\nOPCODE: ", cast[int](c.opcode).toHex(4))
+        #Execute
+        instruction(c)
 
-      #If the delay timer isn't 0 yet...
-      if c.delayTimer != 0u8 and frameTime - timeStart >= sixtyhz:
-        dec(c.delayTimer)
+        #If the draw flag is set...
+        if c.draw:
+          #Unset it
+          c.draw = false
+          #Draw the screen
+          ren.clear
+          draw(c, ren)
+          ren.present
 
-      if frameTime - timeStart >= sixtyhz:
-        timeStart = epochTime()
+        #If the sound timer isn't 0 yet...
+        if c.soundTimer != 0u8 and frameTime - timeStart >= sixtyhz:
+          #Lower it
+          dec(c.soundTimer)
+          #And play a sound
+          if debug:
+            echo("Would have played a sound")
 
-main()
+        #If the delay timer isn't 0 yet...
+        if c.delayTimer != 0u8 and frameTime - timeStart >= sixtyhz:
+          dec(c.delayTimer)
+
+        if frameTime - timeStart >= sixtyhz:
+          timeStart = epochTime()
+
+  main()
