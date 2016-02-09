@@ -354,11 +354,18 @@ instructions[0xF007u16] = proc(c: chip8) =
 instructions[0xF00Au16] = proc(c: chip8) =
   #LD Vx, K X0A
   #We need to lower pc by two if we don't have a key to simplify models
-  #TODO: Implement
-  if false:
+  let xIndex = (c.opcode and 0x0F00u16) shr 8
+  let activeKey = 255
+  for i in 0..<len(keyboard):
+    if keyboard[i]:
+      activeKey = i
+      break
+
+  if activeKey != 255:
     c.pc -= 2
   else:
-    discard
+    c.registers[xIndeex] = activeKey
+
 
 instructions[0xF015u16] = proc(c: chip8) =
   #LD DT, Vx X15
