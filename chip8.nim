@@ -312,8 +312,8 @@ instructions[0xD000u16] = proc(c: chip8) =
 instructions[0xE000u16] = proc(c: chip8) =
   #Switch of most significant nybble
   let maskedOp = c.opcode and 0xF0FFu16
-  if instructions.hasKey(maskedOp)
-    instruction[maskedOp](c)
+  if instructions.hasKey(maskedOp):
+    instructions[maskedOp](c)
     #Increment PC
     c.pc += 2
   else:
@@ -325,7 +325,7 @@ instructions[0xE09Eu16] = proc(c: chip8) =
   #If key down, skip next instruction
   let xIndex = (c.opcode and 0x0F00u16) shr 8
   let x = (c.registers[xIndex])
-  if keys[x]:
+  if c.keyboard[x]:
     c.pc += 2
 
 instructions[0xE0A1u16] = proc(c: chip8) =
@@ -333,14 +333,14 @@ instructions[0xE0A1u16] = proc(c: chip8) =
   #If not key down, skip next instruction
   let xIndex = (c.opcode and 0x0F00u16) shr 8
   let x = (c.registers[xIndex])
-  if not keys[x]:
+  if not c.keyboard[x]:
     c.pc += 2
 
 instructions[0xF000u16] = proc(c: chip8) =
   #Switch of most significant nybble
   let maskedOp = c.opcode and 0xF0FFu16
-  if instructions.hasKey(maskedOp)
-    instruction[maskedOp](c)
+  if instructions.hasKey(maskedOp):
+    instructions[maskedOp](c)
     #Increment PC
     c.pc += 2
   else:
@@ -355,16 +355,16 @@ instructions[0xF00Au16] = proc(c: chip8) =
   #LD Vx, K X0A
   #We need to lower pc by two if we don't have a key to simplify models
   let xIndex = (c.opcode and 0x0F00u16) shr 8
-  let activeKey = 255
-  for i in 0..<len(keyboard):
-    if keyboard[i]:
-      activeKey = i
+  var activeKey = 255u8
+  for i in 0..<len(c.keyboard):
+    if c.keyboard[i]:
+      activeKey = cast[uint8](i)
       break
 
   if activeKey != 255:
     c.pc -= 2
   else:
-    c.registers[xIndeex] = activeKey
+    c.registers[xIndex] = activeKey
 
 
 instructions[0xF015u16] = proc(c: chip8) =
@@ -389,7 +389,7 @@ instructions[0xF029u16] = proc(c: chip8) =
   #LD F, Vx x29
   let xIndex = (c.opcode and 0x0F00u16) shr 8
   let x = (c.registers[xIndex])
-  c.I = memory[0x50 + 5 * x]
+  c.I = c.memory[0x50u8 + 5u8 * x]
 
 instructions[0xF033u16] = proc(c: chip8) =
   #LD B, Vx
@@ -399,21 +399,21 @@ instructions[0xF033u16] = proc(c: chip8) =
   #Set hundreds
   c.memory[c.I] =
     if x >= 100u8:
-      cast[uint8](($x[0]).toInt)
+      x div 100u8
     else:
       0u8
 
   #Set tens
   c.memory[c.I + 1] =
     if x >= 10u8:
-      cast[uint8](($x[1]).toInt)
+      (x div 10u8) mod 10
     else:
       0u8
 
   #Set ones
   c.memory[c.I + 2] =
     if x >= 1u8:
-      cast[uint8](($x[0]).toInt)
+      (x mod 100) mod 10
     else:
       0u8
 
