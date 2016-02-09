@@ -348,8 +348,12 @@ instructions[0xF007u16] = proc(c: chip8) =
 
 instructions[0xF00Au16] = proc(c: chip8) =
   #LD Vx, K X0A
+  #We need to lower pc by two if we don't have a key to simplify models
   #TODO: Implement
-  discard
+  if false:
+    c.pc -= 2
+  else:
+    discard
 
 instructions[0xF015u16] = proc(c: chip8) =
   #LD DT, Vx X15
