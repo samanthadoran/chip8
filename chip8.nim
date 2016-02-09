@@ -185,7 +185,7 @@ instructions[0x8006u16] = proc(c: chip8) =
   c.registers[xIndex] = x shr 1
 
 instructions[0x8007u16] = proc(c: chip8) =
-  #SUB XY7
+  #SUBN XY7
   let xIndex = (c.opcode and 0x0F00u16) shr 8
   let yIndex = (c.opcode and 0x00F0u16) shr 4
   let x = cast[uint16](c.registers[xIndex])
@@ -199,7 +199,7 @@ instructions[0x8007u16] = proc(c: chip8) =
     else:
       0u8
 
-instructions[0x8006u16] = proc(c: chip8) =
+instructions[0x800Eu16] = proc(c: chip8) =
   #SHL XYE
   let xIndex = (c.opcode and 0x0F00u16) shr 8
   let x = cast[uint8](c.registers[xIndex])
