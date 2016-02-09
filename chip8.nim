@@ -151,6 +151,7 @@ instructions[0x7000u16] = proc(c: chip8) =
 instructions[0x8000u16] = proc(c: chip8) =
   #Switch of most significant nybble
   let lastNybble = c.opcode and 0x000Fu16
+
   if lastNybble == 0x0000u16:
     #LD XY0
     if debug:
@@ -239,7 +240,7 @@ instructions[0x8006u16] = proc(c: chip8) =
 
   #Set VF?
   c.registers[15] =
-    if (x and 0x0001u8) == 0x1u8:
+    if (x and 0x01u8) == 0x1u8:
       1u8
     else:
       0u8
@@ -321,62 +322,32 @@ instructions[0xD000u16] = proc(c: chip8) =
   let xIndex = (c.opcode and 0x0F00u16) shr 8
   let yIndex = (c.opcode and 0x00F0u16) shr 4
   let bytes = c.opcode and 0x000Fu16
-  let x = (c.registers[xIndex])
-  let y = (c.registers[yIndex])
-
-  #So, we need to know what x mod 8 is to see how much we need to play with the
-  #The bitmap via shifting
-  let xM = x mod 8
-  let xdIndex = (x div 8) mod 8
-
-  #Set collision to be zero initially
+  var xPos = (c.registers[xIndex])
+  let yPos = (c.registers[yIndex])
+  c.draw = true
   c.registers[15] = 0
 
-  #So, we should shr every byte my xm then shl by 8 - x in the next byte
-  for i in 0..<bytes:
-    let ydIndex = (y + cast[uint8](i)) mod 32
+  for yAdd in 0..<bytes:
+    let DWORD: uint16 = (cast[uint16](c.memory[c.I + cast[uint16](yAdd)]) shl 8) shr (xPos and 0x7u8)
+    let upperWord: uint8 = cast[uint8](DWORD shr 8)
+    let lowerWord: uint8 = cast[uint8](DWORD)
+    let yLoopPos = (yPos + cast[uint8](yAdd)) mod 32
+    let xLoopPos = (xPos div 8) mod 8
+    #Upper word
+    let original = c.display[yLoopPos][(xPos div 8)]
+    c.display[yLoopPos][xLoopPos] =
+      c.display[yLoopPos][xLoopPos] xor upperWord
 
-    #Keep a copy of the original so we can compare to it
-    let original = c.display[ydIndex][xdIndex]
-    #Chip 8 displays by xoring the screen
-    c.display[ydIndex][xdIndex] = (c.display[ydIndex][xdIndex]) xor (c.memory[c.I + cast[uint16](i)] shr xM)
+    if (original and c.display[yLoopPos][xLoopPos]) != original:
+      c.registers[15] = 1
 
-    #If it is different, we will need to update the screen
-    if original != c.display[ydIndex][xdIndex]:
-      c.draw = true
+    #Lower word
+    let originalLower = c.display[yLoopPos][(xLoopPos + 1) mod 8]
+    c.display[yLoopPos][(xLoopPos + 1) mod 8] =
+      c.display[yLoopPos][(xLoopPos + 1) mod 8] xor lowerWord
 
-    #If original AND new isn't the same, we disabled a pixel, thus set collision
-    if (original and c.display[ydIndex][xdIndex]) != original:
-      c.registers[15] = 1u8
-
-    #If we haven't done this aligned, we need some shl logic
-    if xM != 0:
-
-      #We need to start at x = 0
-      if xdIndex == 7u8:
-        let originalLeftTrick = c.display[ydIndex][0]
-        c.display[ydIndex][0] = c.display[ydIndex][0] xor (c.memory[c.I + cast[uint16](i)] shl (8u8 - xM))
-
-        #If it is different, we will need to update the screen
-        if originalLeftTrick != c.display[ydIndex][0]:
-          c.draw = true
-
-        #If original AND new isn't the same, we disabled a pixel, thus set collision
-        if (originalLeftTrick and c.display[ydIndex][0]) != originalLeftTrick:
-          c.registers[15] = 1u8
-
-      #We aren't wrapping around to the left, just add one
-      else:
-        let originalLeftTrick = c.display[ydIndex][xdIndex + 1]
-        c.display[y][xdIndex + 1] = c.display[ydIndex][xdIndex + 1] xor (c.memory[c.I + cast[uint16](i)] shl (8u8 - xM))
-
-        #If it is different, we will need to update the screen
-        if originalLeftTrick != c.display[ydIndex][xdIndex + 1]:
-          c.draw = true
-
-        #If original AND new isn't the same, we disabled a pixel, thus set collision
-        if (originalLeftTrick and c.display[ydIndex][xdIndex + 1]) != originalLeftTrick:
-          c.registers[15] = 1u8
+    if(originalLower and c.display[yLoopPos][(xLoopPos + 1) mod 8]) != originalLower:
+      c.registers[15] = 1
 
   c.pc += 2
 
@@ -569,7 +540,8 @@ proc draw*(c: chip8, ren: RendererPtr) =
   for y in 0..<len(c.display):
     for x in 0..<len(c.display[y]):
       for bit in 0..7:
-        let xPosition = (x * 8) + bit
+        #REMEMBER ENDIANESS
+        let xPosition = (x * 8) + (8 - bit)
         var r: Rect
         r.x = cast[cint](xPosition) * 8
         r.y = cast[cint](y) * 8
@@ -653,7 +625,7 @@ when isMainModule:
       quit(1)
 
     var c = newChip8()
-    if c.loadRom("TETRIS"):
+    if c.loadRom("INVADERS"):
       var timeStart = epochTime()
       let sixtyhz = (1.0/60.0)
       var runGame = true

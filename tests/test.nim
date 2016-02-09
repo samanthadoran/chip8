@@ -13,6 +13,7 @@ suite "Initialize":
     check c.soundTimer == 0
     check c.delayTimer == 0
 
+#TODO: test Bnnn - JP V0, addr
 echo("Testing jump, call, and ret")
 suite "Jump, Call, and Ret":
   var c = newChip8()
@@ -144,3 +145,82 @@ suite("Branching instructions"):
     let g = c.decode()
     g(c)
     check c.pc == pc + 4
+
+echo("Testing arithmetic operations")
+suite "Arithmetic operations":
+  var c = newChip8()
+  test("7xkk ADD Vx, byte"):
+    c.opcode = 0x750Fu16
+    let r = c.registers[5]
+    let f = c.decode()
+    f(c)
+    check r + 0x00Fu8 == c.registers[5]
+    discard
+  test("8xy1 OR Vx, Vy"):
+    c.opcode = 0x8011u16
+    c.registers[0] = 0x0Fu8
+    c.registers[1] = 0xF0u8
+    let f = c.decode()
+    f(c)
+    check c.registers[0] == 0xFFu8
+  test("8xy2 AND Vx, Vy"):
+    c.opcode = 0x8012u16
+    c.registers[0] = 0x0Fu8
+    c.registers[1] = 0xF0u8
+    let f = c.decode()
+    f(c)
+    check c.registers[0] == 0x00u8
+  test("8xy3 XOR Vx, Vy"):
+    c.opcode = 0x8013u16
+    c.registers[0] = 0x0Fu8
+    c.registers[1] = 0xF0u8
+    let f = c.decode()
+    f(c)
+    check c.registers[0] == 0xFFu8
+    c.opcode = 0x8013u16
+    c.registers[0] = 0x0Fu8
+    c.registers[1] = 0x0Fu8
+    let g = c.decode()
+    g(c)
+    check c.registers[0] == 0x00u8
+  test("8xy4 ADD Vx, Vy"):
+    c.opcode = 0x8014u16
+    c.registers[0] = 7u8
+    c.registers[1] = 11u8
+    let f = c.decode()
+    f(c)
+    check((c.registers[0] == 18u8) and (c.registers[15] == 0))
+    #Check for carry
+    c.opcode = 0x8014u16
+    c.registers[0] = 255u8
+    c.registers[1] = 1u8
+    let g = c.decode()
+    g(c)
+    check((c.registers[0] == 0u8) and (c.registers[15] == 1))
+  #TODO: Check Vf for borrow
+  test("8xy5 SUB Vx, Vy"):
+    c.opcode = 0x8015u16
+    c.registers[0] = 11u8
+    c.registers[1] = 7u8
+    let f = c.decode()
+    f(c)
+    check((c.registers[0] == 4u8) and (c.registers[15] == 1))
+    #Check for carry
+    c.opcode = 0x8015u16
+    c.registers[0] = 0u8
+    c.registers[1] = 1u8
+    let g = c.decode()
+    g(c)
+    check((c.registers[0] == 255u8) and (c.registers[15] == 0))
+  test("8xy6 SHR Vx {, Vy}"):
+    discard
+  test("8xy7 SUBN Vx, Vy"):
+    discard
+  test("8xyE SHL Vx {, Vy}"):
+    discard
+  test("Cxkk RND Vx, byte"):
+    discard
+  test("Dxyn DRW Vx, Vy, nibble"):
+    discard
+  test("Fx1E ADD I, Vx"):
+    discard
