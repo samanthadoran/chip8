@@ -1,4 +1,4 @@
-import tables, strutils, math
+import tables, strutils, math, sdl2, times
 
 type
   chip8 = ref Chip8Obj
@@ -32,7 +32,7 @@ type
 
   ops = Table[uint16, proc(c: chip8)]
 
-var debug = true
+var debug = false
 const fontOffset = 0x50u16
 const romOffset = 0x200u16
 
@@ -314,6 +314,7 @@ instructions[0xC000u16] = proc(c: chip8) =
 
 instructions[0xD000u16] = proc(c: chip8) =
   #DRAW XYN
+  c.draw = true
   if debug:
     echo("DRAW XYN")
   let xIndex = (c.opcode and 0x0F00u16) shr 8
@@ -465,7 +466,7 @@ instructions[0xF018u16] = proc(c: chip8) =
   let x = (c.registers[xIndex])
   c.soundTimer = x
 
-instructions[0xF018u16] = proc(c: chip8) =
+instructions[0xF01Eu16] = proc(c: chip8) =
   #ADD I, Vx X1E
   if debug:
     echo("ADD I, Vx X1E")
@@ -567,10 +568,120 @@ proc decode(c: chip8): proc(c: chip8) =
     while true:
       discard
 
+proc draw(c: chip8, ren: RendererPtr) =
+  for y in 0..<len(c.display):
+    for x in 0..<len(c.display[y]):
+      for bit in 0..7:
+        let xPosition = (x * 8) + bit
+        var r: Rect
+        r.x = cast[cint](xPosition) * 8
+        r.y = cast[cint](y) * 8
+        r.w = 8
+        r.h = 8
+        let state: bool = ((c.display[y][x] shr cast[uint8](bit)) and 0x1u8) == 0x1
+        if state:
+          setDrawColor(ren, uint8(255), uint8(255), uint8(255))
+          fillRect(ren, r)
+        setDrawColor(ren, uint8(0), uint8(0), uint8(0))
+
+proc setStateOfKey(c: chip8, key: Scancode, state: bool) =
+  case key
+  #1
+  of SDL_SCANCODE_1:
+    c.keyboard[0] = state
+  #2
+  of SDL_SCANCODE_2:
+    c.keyboard[1] = state
+  #3
+  of SDL_SCANCODE_3:
+    c.keyboard[2] = state
+  #4
+  of SDL_SCANCODE_4:
+    c.keyboard[3] = state
+  #Q
+  of SDL_SCANCODE_Q:
+    c.keyboard[4] = state
+  #W
+  of SDL_SCANCODE_W:
+    c.keyboard[5] = state
+  #E
+  of SDL_SCANCODE_E:
+    c.keyboard[6] = state
+  #R
+  of SDL_SCANCODE_R:
+    c.keyboard[7] = state
+  #A
+  of SDL_SCANCODE_A:
+    c.keyboard[8] = state
+  #S
+  of SDL_SCANCODE_S:
+    c.keyboard[9] = state
+  #D
+  of SDL_SCANCODE_D:
+    c.keyboard[10] = state
+  #F
+  of SDL_SCANCODE_F:
+    c.keyboard[11] = state
+  #Z
+  of SDL_SCANCODE_Z:
+    c.keyboard[12] = state
+  #X
+  of SDL_SCANCODE_X:
+    c.keyboard[13] = state
+  #C
+  of SDL_SCANCODE_C:
+    c.keyboard[14] = state
+  #V
+  of SDL_SCANCODE_V:
+    c.keyboard[15] = state
+  else:
+    discard
+
 proc main() =
+  #Setup SDL
+  var
+    win: WindowPtr
+    ren: RendererPtr
+    evt = sdl2.defaultEvent
+  discard init(INIT_EVERYTHING)
+  win = createWindow("chip8 emulator", 100, 100, 1280, 720, SDL_WINDOW_SHOWN)
+  if win == nil:
+    echo("Create window failed! Error: ", getError())
+    quit(1)
+
+  ren = createRenderer(win, -1, Renderer_Accelerated)
+  if ren == nil:
+    echo("Create renderer failed! Error: ", getError())
+    quit(1)
+
   var c = newChip8()
-  if c.loadRom("maze"):
+  if c.loadRom("INVADERS"):
+    var timeStart = epochTime()
+    let sixtyhz = (1.0/60.0)
+    var runGame = true
     while true:
+      #Handle Events
+      let frameTime = epochTime()
+      if frameTime - timeStart < sixtyhz / 10:
+        continue
+      while pollEvent(evt):
+        if evt.kind == QuitEvent:
+          runGame = false
+          break
+
+        if evt.kind == KeyDown:
+          var keyboardEvent = cast[KeyboardEventPtr](addr(evt))
+          let key = keyboardEvent.keysym.scancode
+          c.setStateOfKey(key, true)
+
+        if evt.kind == KeyUp:
+          var keyboardEvent = cast[KeyboardEventPtr](addr(evt))
+          let key = keyboardEvent.keysym.scancode
+          c.setStateOfKey(key, false)
+
+      if not runGame:
+        break
+
       #Fetch
       c.fetch()
       #Decode
@@ -585,21 +696,23 @@ proc main() =
         #Unset it
         c.draw = false
         #Draw the screen
-        if debug:
-          echo("Would have drawn")
+        ren.clear
+        draw(c, ren)
+        ren.present
 
       #If the sound timer isn't 0 yet...
-      if c.soundTimer != 0u8:
+      if c.soundTimer != 0u8 and frameTime - timeStart >= sixtyhz:
         #Lower it
-        #TODO: Change to 60hz
         dec(c.soundTimer)
         #And play a sound
         if debug:
           echo("Would have played a sound")
 
       #If the delay timer isn't 0 yet...
-      if c.delayTimer != 0u8:
-        #TODO: Change to 60hz
+      if c.delayTimer != 0u8 and frameTime - timeStart >= sixtyhz:
         dec(c.delayTimer)
+
+      if frameTime - timeStart >= sixtyhz:
+        timeStart = epochTime()
 
 main()
