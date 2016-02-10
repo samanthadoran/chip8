@@ -132,8 +132,9 @@ instructions[0xC000u16] = proc(c: Chip8) =
   if debug:
     echo("RND XKK")
   let xIndex = (c.opcode and 0x0F00u16) shr 8
-  let x = c.registers[xIndex]
-  c.registers[xIndex] = x and cast[uint8](random(256))
+  let kk = c.opcode and 0x00FFu16
+
+  c.registers[xIndex] = kk and cast[uint8](random(256))
   c.pc += 2
 
 instructions[0xD000u16] = proc(c: Chip8) =
