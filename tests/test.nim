@@ -1,4 +1,4 @@
-import unittest, ../chip8
+import unittest, ../src/chip8
 
 echo("Testing init")
 suite "Initialize":
