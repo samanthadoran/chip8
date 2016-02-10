@@ -90,11 +90,14 @@ proc fetch*(c: Chip8) =
   #but it looks nice as a one liner
   c.opcode = (cast[uint16](c.memory[c.pc]) shl 8) or cast[uint16](c.memory[c.pc + 1])
 
+proc unknownOpcode*(c: Chip8) =
+  echo("Unknown opcode: " & cast[int](c.opcode).toHex(4))
+  while true:
+    discard
+
 proc decode*(c: Chip8): proc(c: Chip8) =
   let firstNybble = 0xF000u16 and c.opcode
   if instructions.hasKey(firstNybble):
     result = instructions[firstNybble]
   else:
-    echo("Unknown opcode: " & cast[int](c.opcode).toHex(4))
-    while true:
-      discard
+    unknownOpcode(c)

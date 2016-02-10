@@ -7,9 +7,7 @@ instructions[0x0000u16] = proc(c: Chip8) =
     instructions[c.opcode and 0x0FFFu16](c)
     c.pc += 2
   else:
-    echo("Unknown opcode: " & cast[int](c.opcode).toHex(4))
-    while true:
-      discard
+    unknownOpcode(c)
 
 instructions[0x8000u16] = proc(c: Chip8) =
   #Switch of most significant nybble
@@ -23,13 +21,10 @@ instructions[0x8000u16] = proc(c: Chip8) =
     let xIndex = (c.opcode and 0x0F00u16) shr 8
     let yIndex = (c.opcode and 0x00F0u16) shr 4
     c.registers[xIndex] = c.registers[yIndex]
+  elif instructions.hasKey(c.opcode and 0xF00Fu16):
+    instructions[c.opcode and 0xF00Fu16](c)
   else:
-    if instructions.hasKey(c.opcode and 0xF00Fu16):
-      instructions[c.opcode and 0xF00Fu16](c)
-    else:
-      echo("Unknown opcode: " & cast[int](c.opcode).toHex(4))
-      while true:
-        discard
+    unknownOpcode(c)
 
   #Increment PC
   c.pc += 2
@@ -42,7 +37,7 @@ instructions[0xE000u16] = proc(c: Chip8) =
     #Increment PC
     c.pc += 2
   else:
-    echo("Unknown opcode: " & cast[int](c.opcode).toHex(4))
+    unknownOpcode(c)
 
 instructions[0xF000u16] = proc(c: Chip8) =
   #Switch of most significant nybble
@@ -52,4 +47,4 @@ instructions[0xF000u16] = proc(c: Chip8) =
     #Increment PC
     c.pc += 2
   else:
-    echo("Unknown opcode: " & cast[int](c.opcode).toHex(4))
+    unknownOpcode(c)
