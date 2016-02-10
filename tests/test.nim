@@ -44,8 +44,8 @@ suite "Jump, Call, and Ret":
     check c.pc == beforeCallPC + 2
     check c.sp == sp - 1
 
-echo("Branch operations")
-suite("Branching instructions"):
+echo("Skip operations")
+suite("Skip instructions"):
   var c = newChip8()
   test"3xkk SE Vx, byte":
     #Check on not equal
@@ -146,6 +146,8 @@ suite("Branching instructions"):
     g(c)
     check c.pc == pc + 4
 
+
+#TODO: Finish test suite
 echo("Testing arithmetic operations")
 suite "Arithmetic operations":
   var c = newChip8()

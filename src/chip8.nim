@@ -1,37 +1,7 @@
 import tables, strutils, math, sdl2, times
-import machine, arithmeticops, branchops
+import machine, partialmaskops, arithmeticops, branchops, loadstoreops
 
-#TODO: test suite
-
-instructions[0x0000u16] = proc(c: Chip8) =
-  #Ignore SYS ADDR 0NNN
-  if instructions.hasKey(c.opcode):
-    instructions[c.opcode and 0x0FFFu16](c)
-    c.pc += 2
-  else:
-    echo("Unknown opcode: " & cast[int](c.opcode).toHex(4))
-    while true:
-      discard
-
-instructions[0xE000u16] = proc(c: Chip8) =
-  #Switch of most significant nybble
-  let maskedOp = c.opcode and 0xF0FFu16
-  if instructions.hasKey(maskedOp):
-    instructions[maskedOp](c)
-    #Increment PC
-    c.pc += 2
-  else:
-    echo("Unknown opcode: " & cast[int](c.opcode).toHex(4))
-
-instructions[0xF000u16] = proc(c: Chip8) =
-  #Switch of most significant nybble
-  let maskedOp = c.opcode and 0xF0FFu16
-  if instructions.hasKey(maskedOp):
-    instructions[maskedOp](c)
-    #Increment PC
-    c.pc += 2
-  else:
-    echo("Unknown opcode: " & cast[int](c.opcode).toHex(4))
+export machine
 
 proc draw*(c: Chip8, ren: RendererPtr) =
   for y in 0..<len(c.display):

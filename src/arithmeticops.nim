@@ -17,28 +17,6 @@ instructions[0x7000u16] = proc(c: Chip8) =
   c.registers[xIndex] += c.opcode and 0x00FFu16
   c.pc += 2
 
-instructions[0x8000u16] = proc(c: Chip8) =
-  #Switch of most significant nybble
-  let lastNybble = c.opcode and 0x000Fu16
-
-  if lastNybble == 0x0000u16:
-    #LD XY0
-    if debug:
-      echo("LD XY0")
-    let xIndex = (c.opcode and 0x0F00u16) shr 8
-    let yIndex = (c.opcode and 0x00F0u16) shr 4
-    c.registers[xIndex] = c.registers[yIndex]
-  else:
-    if instructions.hasKey(c.opcode and 0xF00Fu16):
-      instructions[c.opcode and 0xF00Fu16](c)
-    else:
-      echo("Unknown opcode: " & cast[int](c.opcode).toHex(4))
-      while true:
-        discard
-
-  #Increment PC
-  c.pc += 2
-
 instructions[0x8001u16] = proc(c: Chip8) =
   #OR XY1
   if debug:
