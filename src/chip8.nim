@@ -77,6 +77,8 @@ when isMainModule:
   import os
   proc main() =
     let romPath = if paramCount() > 0: paramStr(1) else: "INVADERS"
+    let hz = if paramCount() > 1: paramStr(2).parseInt else: 1200
+    let ms = 1.0 / hz.toFloat
     #Setup SDL
     var
       win: WindowPtr
@@ -102,7 +104,9 @@ when isMainModule:
       while true:
         #Handle Events
         let frameTime = epochTime()
-        if frameTime - timeStart < sixtyhz / 20:
+
+        #if frameTime - timeStart < sixtyhz / 20:
+        if frameTime - timeStart < ms:
           continue
         else:
           timeStart = epochTime()
