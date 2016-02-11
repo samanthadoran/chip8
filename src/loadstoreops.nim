@@ -34,7 +34,6 @@ instructions[0xF00Au16] = proc(c: Chip8) =
   for i in 0..<len(c.keyboard):
     if c.keyboard[i]:
       activeKey = cast[uint8](i)
-      break
 
   #We need to lower pc by two. This allows us to pretend to 'wait' for a key
   if activeKey == 255:

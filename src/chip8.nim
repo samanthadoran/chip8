@@ -96,13 +96,28 @@ when isMainModule:
     var c = newChip8()
     if c.loadRom(romPath):
       var timeStart = epochTime()
+      var timersStart = epochTime()
       let sixtyhz = (1.0/60.0)
       var runGame = true
       while true:
         #Handle Events
         let frameTime = epochTime()
-        if frameTime - timeStart < sixtyhz / 10:
+        if frameTime - timeStart < sixtyhz / 20:
           continue
+        else:
+          timeStart = epochTime()
+
+        #If the sound timer isn't 0 yet...
+        if frameTime - timersStart >= sixtyhz:
+          timersStart = epochTime()
+          #Lower it
+          if c.soundTimer > 0u8:
+            dec(c.soundTimer)
+            if debug:
+              echo("Would have played a sound")
+          if c.delayTimer > 0u8:
+            dec(c.delayTimer)
+
         while pollEvent(evt):
           if evt.kind == QuitEvent:
             runGame = false
@@ -138,18 +153,6 @@ when isMainModule:
           ren.clear
           draw(c, ren)
           ren.present
-
-        #If the sound timer isn't 0 yet...
-        if c.soundTimer != 0u8 and frameTime - timeStart >= sixtyhz:
-          #Lower it
-          dec(c.soundTimer)
-          #And play a sound
-          if debug:
-            echo("Would have played a sound")
-
-        #If the delay timer isn't 0 yet...
-        if c.delayTimer != 0u8 and frameTime - timeStart >= sixtyhz:
-          dec(c.delayTimer)
 
         if frameTime - timeStart >= sixtyhz:
           timeStart = epochTime()
