@@ -7,7 +7,7 @@ proc draw*(c: Chip8, ren: RendererPtr) =
   for y in 0..<len(c.display):
     for x in 0..<len(c.display[y]):
       for bit in 0..7:
-        #REMEMBER ENDIANESS
+        #Remember to make it 8 - bit, not just bit!
         let xPosition = (x * 8) + (8 - bit)
         var r: Rect
         r.x = cast[cint](xPosition) * 8
@@ -102,10 +102,7 @@ when isMainModule:
       let sixtyhz = (1.0/60.0)
       var runGame = true
       while true:
-        #Handle Events
         let frameTime = epochTime()
-
-        #if frameTime - timeStart < sixtyhz / 20:
         if frameTime - timeStart < ms:
           continue
         else:
@@ -122,6 +119,7 @@ when isMainModule:
           if c.delayTimer > 0u8:
             dec(c.delayTimer)
 
+        #Handle Events
         while pollEvent(evt):
           if evt.kind == QuitEvent:
             runGame = false
@@ -157,8 +155,5 @@ when isMainModule:
           ren.clear
           draw(c, ren)
           ren.present
-
-        if frameTime - timeStart >= sixtyhz:
-          timeStart = epochTime()
 
   main()
